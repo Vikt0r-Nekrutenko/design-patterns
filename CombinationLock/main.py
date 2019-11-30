@@ -40,28 +40,29 @@ class MyWindow(QtWidgets.QMainWindow):
             component.receive_signal(key.text())
 
 
+
+
 class Microprocessor(Receiver, Sender):
     def __init__(self):
-        self.__pass_key = PassKeyHandler()
-        self.__ctrl_key = ControlKeyHandler()
-
         self.__input = []
 
-        self.__pass_key.set_next(self.__ctrl_key)
+        self.pass_key = ['1']
+        self.ctrl_key = ['2']
 
-        self.pass_key = ['1', '1', '1', '1']
-        self.ctrl_key = ['2', '2', '2', '2']
-        self.cp = False
-
-    def receive_signal(self, signal):
+    def receive_signal(self, signal):        
         self.__input.append(signal)
         self.send_signal("".join(self.__input))
 
-        if len(self.__input) == 4:
-            result = self.__pass_key.handle(self.__input)
+        if len(self.pass_key) < 4:
+            self.pass_key.append(signal)
+            self.send_signal("".join(self.pass_key))
+            self.__input.clear()
 
-            if result:
-                self.send_signal(result)
+        if len(self.__input) == 4:
+            if self.__input == self.pass_key:
+                self.send_signal("Unlocked")
+            elif self.__input == self.ctrl_key:
+                self.pass_key.clear()
             self.__input.clear()
 
 
@@ -82,6 +83,7 @@ if __name__ == "__main__":
 
     window.show()
     sys.exit(app.exec_())
+
 
 """
             container = []
