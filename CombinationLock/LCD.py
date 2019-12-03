@@ -1,6 +1,6 @@
 from CombinationLock.Receiver import Receiver
 
 
-class Bell(Receiver):
+class LCD(Receiver):
     def receive_signal(self, signal):
-        print("Ding-dong mafaka!!!")
+        print(f"LCD: {signal}")

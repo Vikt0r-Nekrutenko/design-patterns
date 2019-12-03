@@ -1,125 +1,43 @@
-# This Python file uses the following encoding: utf-8
-import sys
-
-from window import *
-from PyQt5 import QtWidgets, QtCore
-from PasswordHandlers import *
-from DigitalDisplay import DigitalDisplay
-from Bell import Bell
-from ComponentsTypes import Receiver, Sender
-from Lock import Lock
+import threading
+from CombinationLock.LCD import LCD
+from CombinationLock.Lock import Lock
+from CombinationLock.Bell import Bell
+from CombinationLock.Receiver import Receiver
+from CombinationLock.KeboardPanel import KeyboardPanel
 
 
-class MyWindow(QtWidgets.QMainWindow):
-    def __init__(self, parent=None):
-        QtWidgets.QWidget.__init__(self, parent)
-        self.ui = Ui_MainWindow()
-        self.ui.setupUi(self)
+class Microprocessor(Receiver):
+    out_0 = LCD()
+    out_1 = Bell()
+    out_2 = Lock()
 
-        self.ui.one_btn.clicked.connect(lambda: self.send_signal(self.ui.one_btn))
-        self.ui.two_btn.clicked.connect(lambda: self.send_signal(self.ui.two_btn))
-        self.ui.three_btn.clicked.connect(lambda: self.send_signal(self.ui.three_btn))
-        self.ui.four_btn.clicked.connect(lambda: self.send_signal(self.ui.four_btn))
-        self.ui.five_btn.clicked.connect(lambda: self.send_signal(self.ui.five_btn))
-        self.ui.six_btn.clicked.connect(lambda: self.send_signal(self.ui.six_btn))
-        self.ui.seven_btn.clicked.connect(lambda: self.send_signal(self.ui.seven_btn))
-        self.ui.eight_btn.clicked.connect(lambda: self.send_signal(self.ui.eight_btn))
-        self.ui.nine_btn.clicked.connect(lambda: self.send_signal(self.ui.nine_btn))
-        self.ui.zero_btn.clicked.connect(lambda: self.send_signal(self.ui.zero_btn))
+    pass_key = "1111"
+    ctrl_key = "2222"
 
-        self.ui.control_btn.clicked.connect(lambda: self.send_signal(self.ui.control_btn))
-        self.ui.bell_btn.clicked.connect(lambda: self.send_signal(self.ui.bell_btn))
+    def receive_signal(self, signal):
+        if signal == "call":
+            self.out_1.receive_signal(signal)
+        else:
+            if self.out_2.state.info == "locked":
+                if signal == self.pass_key:
+                    self.procedure()
+                    th = threading.Timer(5, self.procedure)
+                    th.start()
+            elif self.out_2.state.info == "unlocked":
+                if signal == self.ctrl_key:
+                    if len(signal) == 4:
+                        print("Pass key changed: ", self.pass_key)
+                        self.pass_key = signal
+            self.out_0.receive_signal(signal)
 
-        self.components = []
-
-    def add_component(self, component):
-        self.components.append(component)
-
-    def send_signal(self, key):
-        for component in self.components:
-            component.receive_signal(key.text())
-
-
-
-
-class Microprocessor(Receiver, Sender):
-    def __init__(self):
-        self.__input = []
-
-        self.pass_key = ['1']
-        self.ctrl_key = ['2']
-
-    def receive_signal(self, signal):        
-        self.__input.append(signal)
-        self.send_signal("".join(self.__input))
-
-        if len(self.pass_key) < 4:
-            self.pass_key.append(signal)
-            self.send_signal("".join(self.pass_key))
-            self.__input.clear()
-
-        if len(self.__input) == 4:
-            if self.__input == self.pass_key:
-                self.send_signal("Unlocked")
-            elif self.__input == self.ctrl_key:
-                self.pass_key.clear()
-            self.__input.clear()
+    def procedure(self):
+        self.out_2.receive_signal(None)
+        print(f"Lock: {self.out_2.state.info}")
 
 
 if __name__ == "__main__":
-    app = QtWidgets.QApplication(sys.argv)
-    window = MyWindow()
-
+    kp = KeyboardPanel()
     mic = Microprocessor()
-    lcd = DigitalDisplay(window.ui.lcdNumber)
-    bell = Bell()
-    lock = Lock(window.ui.label)
-
-    mic.add_receiver(lock)
-    mic.add_receiver(lcd)
-
-    window.add_component(mic)
-    window.add_component(bell)
-
-    window.show()
-    sys.exit(app.exec_())
-
-
-"""
-            container = []
-            self.ui.one_btn.clicked.connect(lambda: container.append(self.ui.one_btn.text()))
-            self.ui.one_btn.clicked.connect(lambda: self.ui.lcdNumber.display("".join(container)))
-
-            self.ui.two_btn.clicked.connect(lambda: container.append(self.ui.two_btn.text()))
-            self.ui.two_btn.clicked.connect(lambda: self.ui.lcdNumber.display("".join(container)))
-
-            self.ui.three_btn.clicked.connect(lambda: container.append(self.ui.three_btn.text()))
-            self.ui.three_btn.clicked.connect(lambda: self.ui.lcdNumber.display("".join(container)))
-
-            self.ui.four_btn.clicked.connect(lambda: container.append(self.ui.four_btn.text()))
-            self.ui.four_btn.clicked.connect(lambda: self.ui.lcdNumber.display("".join(container)))
-
-            self.ui.five_btn.clicked.connect(lambda: container.append(self.ui.five_btn.text()))
-            self.ui.five_btn.clicked.connect(lambda: self.ui.lcdNumber.display("".join(container)))
-
-            self.ui.six_btn.clicked.connect(lambda: container.append(self.ui.six_btn.text()))
-            self.ui.six_btn.clicked.connect(lambda: self.ui.lcdNumber.display("".join(container)))
-
-            self.ui.seven_btn.clicked.connect(lambda: container.append(self.ui.seven_btn.text()))
-            self.ui.seven_btn.clicked.connect(lambda: self.ui.lcdNumber.display("".join(container)))
-
-            self.ui.eight_btn.clicked.connect(lambda: container.append(self.ui.eight_btn.text()))
-            self.ui.eight_btn.clicked.connect(lambda: self.ui.lcdNumber.display("".join(container)))
-
-            self.ui.nine_btn.clicked.connect(lambda: container.append(self.ui.nine_btn.text()))
-            self.ui.nine_btn.clicked.connect(lambda: self.ui.lcdNumber.display("".join(container)))
-
-            self.ui.zero_btn.clicked.connect(lambda: container.append(self.ui.zero_btn.text()))
-            self.ui.zero_btn.clicked.connect(lambda: self.ui.lcdNumber.display("".join(container)))
-
-            self.ui.control_btn.clicked.connect(lambda: container.clear())
-            self.ui.control_btn.clicked.connect(lambda: self.ui.lcdNumber.display(""))
-
-            self.ui.bell_btn.clicked.connect(lambda: container.clear())
-            self.ui.bell_btn_btn.clicked.connect(lambda: self.ui.lcdNumber.display(""))
-"""
+    kp.out_0 = mic
+    while True:
+        kp.invoke()

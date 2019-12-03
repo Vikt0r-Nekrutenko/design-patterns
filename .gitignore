@@ -3,3 +3,5 @@ git
 .idea
 expression.py
 __pycache__
+*.pyproject
+*.pyproject.user
