@@ -84,7 +84,7 @@ class CtrlHandler(AbstractHandler):
                 self._password = request
                 print(f"Ctrl key changed: {self._password}")
                 self.state = self.state.change()
-                return True
+                return False
             return False
 
 
@@ -97,21 +97,22 @@ class Microprocessor(Receiver):
     ckh = CtrlHandler()
 
     def receive_signal(self, signal):
-        if self.pkh.handle(signal) == True:
-            if self.out_2.state.info == "locked":
-                self.procedure()
-                th = threading.Timer(10, self.procedure)
-                th.start()
+        if self.pkh.handle(signal) == True and self.out_2.state.info == "locked":
+                self.proc()
         elif self.out_2.state.info == "unlocked":
             if signal == "call":
-                if self.ckh.handle(signal) == True:
-                    print("CALL!!!")
-                    self.ckh.state = self.ckh.state.change()
+                self.ckh.state = self.ckh.state.change()
             else:
-                if self.out_2.state.info == "unlocked":
-                    if self.ckh.handle(signal) == True:
-                        self.pkh.state = self.pkh.state.change()
+                if self.ckh.handle(signal) == True:
+                    self.pkh.state = self.pkh.state.change()
+
+
         self.out_0.receive_signal(signal)
+
+    def proc(self):
+        self.procedure()
+        th = threading.Timer(10, self.procedure)
+        th.start()
 
     def procedure(self):
         self.out_2.receive_signal(None)
