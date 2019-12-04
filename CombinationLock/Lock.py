@@ -1,5 +1,5 @@
-from CombinationLock.Receiver import Receiver
-from CombinationLock.LockStates import *
+from Receiver import Receiver
+from LockStates import *
 
 
 class Lock(Receiver):

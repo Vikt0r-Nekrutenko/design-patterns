@@ -1,5 +1,5 @@
 import re
-from CombinationLock.Receiver import Receiver
+from Receiver import Receiver
 
 
 class KeyboardPanel:

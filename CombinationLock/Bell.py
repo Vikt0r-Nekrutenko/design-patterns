@@ -1,4 +1,4 @@
-from CombinationLock.Receiver import Receiver
+from Receiver import Receiver
 
 
 class Bell(Receiver):
