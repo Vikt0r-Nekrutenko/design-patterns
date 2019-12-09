@@ -7,36 +7,40 @@ from Receiver import Receiver
 from KeboardPanel import KeyboardPanel
 
 
-class State(ABC):
-    info = None
+class PasswordHandler:
+    def __init__(self, password):
+        self._tmp = None
+        self._password = password
 
-    @abstractmethod
-    def change(self):
-        pass
+    def read(self, password) -> bool:
+        if self._password == password:
+            return True
+        return False
+
+    def write(self, password) -> bool:
+        if len(password) == 4:
+            self._tmp = password
+            print(f"\t{self._password} will be changed to {password}")
+            return True
+        return False
+
+    def accept(self):
+        if self._tmp:
+            print(f"\t{self._password} was changed to {self._tmp}")
+            self._password = self._tmp
+            self._tmp = None
+            return True
+        return False
+
+    @property
+    def password(self):
+        return self._password
 
 
-class ReadState(State):
-    def __init__(self):
-        self.info = "read"
-
-    def change(self):
-        print(self.info)
-        return WriteState()
-
-
-class WriteState(State):
-    def __init__(self):
-        self.info = "write"
-
-    def change(self):
-        print(self.info)
-        return ReadState()
-
-
-class AbstractHandler:
-    _password = None
-    _next_handler = None
-    state = None
+class Handler(ABC):
+    def __init__(self, mic):
+        self._mic = mic
+        self._next_handler = None
 
     def set_next(self, handler):
         self._next_handler = handler
@@ -46,73 +50,110 @@ class AbstractHandler:
     def handle(self, request):
         if self._next_handler:
             return self._next_handler.handle(request)
-
         return None
 
 
-class PassHandler(AbstractHandler):
-    def __init__(self):
-        self._password = "1111"
-        self.state = ReadState()
+class OpenLockHandler(Handler):
+    def handle(self, request):
+        if self._mic.out_2.state.info == "unlocked":
+            return super().handle(request)
+        return None
+
+
+class ClosedLockHandler(Handler):
+    def handle(self, request):
+        if self._mic.out_2.state.info == "locked":
+            return super().handle(request)
+        return None
+
+
+class PassKeyHandler(Handler):
+    pass_key = "1111"
 
     def handle(self, request):
-        if self.state.info == "read":
-            if self._password == request:
-                return True
-            return False
-        elif self.state.info == "write":
-            if len(request) == 4:
-                self._password = request
-                print(f"Pass key changed: {self._password}")
-                self.state = self.state.change()
-                return True
-            return False
+        if request == self.pass_key:
+            self._mic.procedure()
+            th = threading.Timer(10, self._mic.procedure)
+            th.start()
+            return super().handle(request)
+        return None
 
 
-class CtrlHandler(AbstractHandler):
-    def __init__(self):
-        self._password = "2222"
-        self.state = ReadState()
+class CtrlKeyHandler(Handler):
+    ctrl_key = "2222"
 
     def handle(self, request):
-        if self.state.info == "read":
-            if self._password == request:
-                return True
-            return False
-        elif self.state.info == "write":
-            if len(request) == 4:
-                self._password = request
-                print(f"Ctrl key changed: {self._password}")
-                self.state = self.state.change()
-                return False
-            return False
+        inp = self._mic.in_0.invoke()
+        if inp == self.ctrl_key:
+            return super().handle(request)
+        return None
+
+
+class CallButtonHandler(Handler):
+    def __init__(self, mic):
+        Handler.__init__(self, mic)
+        self.ctrl_flag = False
+
+    def handle(self, request):
+        if request == "call":
+            self.ctrl_flag = True
+            self._mic.out_1.receive_signal(None)
+        return super().handle(request)
+
+
+class PassKeyChangeHandler(Handler):
+    def handle(self, request):
+        inp = self._mic.in_0.invoke()
+        if len(inp) == 4:
+            print(f"\t{inp} will be next pass key")
+            if self._mic.cbh.ctrl_flag:
+                self.set_next(self._mic.ckah)
+            else:
+                self.set_next(self._mic.pkah)
+            return super().handle(inp)
+        return None
+
+
+class PassKeyAcceptHandler(Handler):
+    def __init__(self, pass_key_handler, mic):
+        Handler.__init__(self, mic)
+        self._pkh = pass_key_handler
+
+    def handle(self, request):
+        inp = self._mic.in_0.invoke()
+
+        if inp == "ctrl":
+            self._pkh.pass_key = request
+            print(f"\t{request} is next pass key")
+            return super().handle(request)
+        return None
 
 
 class Microprocessor(Receiver):
+    in_0 = KeyboardPanel()
     out_0 = LCD()
     out_1 = Bell()
     out_2 = Lock()
 
-    pkh = PassHandler()
-    ckh = CtrlHandler()
+    def __init__(self):
+        self.olh = OpenLockHandler(self)
+        self.clh = ClosedLockHandler(self)
+
+        self.pkh = PassKeyHandler(self)
+        self.ckh = CtrlKeyHandler(self)
+
+        self.pkch = PassKeyChangeHandler(self)
+
+        self.cbh = CallButtonHandler(self)
+        self.pkah = PassKeyAcceptHandler(self.pkh, self)
+        self.ckah = PassKeyAcceptHandler(self.ckh, self)
+
+        self.cbh.set_next(self.clh).set_next(self.pkh).set_next(self.olh).set_next(self.ckh).set_next(self.ckh).set_next(self.pkch)
 
     def receive_signal(self, signal):
-        if self.pkh.handle(signal) == True and self.out_2.state.info == "locked":
-                self.proc()
-        elif self.out_2.state.info == "unlocked":
-            if signal == "call":
-                self.ckh.state = self.ckh.state.change()
-            else:
-                if self.ckh.handle(signal) == True:
-                    self.pkh.state = self.pkh.state.change()
-
-
+        signal = self.in_0.invoke()
+        self.cbh.handle(signal)
         self.out_0.receive_signal(signal)
-
-    def proc(self):
-        self.procedure()
-        th = threading.Timer(10, self.procedure)
-        th.start()
 
     def procedure(self):
         self.out_2.receive_signal(None)
@@ -122,6 +163,5 @@ class Microprocessor(Receiver):
 if __name__ == "__main__":
     kp = KeyboardPanel()
     mic = Microprocessor()
-    kp.out_0 = mic
     while True:
-        kp.invoke()
+        mic.receive_signal(None)
